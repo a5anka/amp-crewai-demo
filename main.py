@@ -65,8 +65,19 @@ crew = Crew(
 
 # Run the crew
 if __name__ == "__main__":
-    result = crew.kickoff(inputs={'topic': 'AI agent frameworks'})
-    print("\n\n########################")
-    print("## FINAL RESULT:")
-    print("########################\n")
-    print(result)
+    # Ask user for topic
+    topic = input("Enter the topic you'd like to research: ")
+
+    print(f"\n🔍 Researching and writing about: {topic}")
+    print("=" * 60)
+
+    result = crew.kickoff(inputs={'topic': topic})
+
+    # Format output as a blog post
+    print("\n" + "=" * 60)
+    print("📝 BLOG POST")
+    print("=" * 60)
+    print(f"\nTopic: {topic}")
+    print("-" * 60)
+    print(f"\n{result}\n")
+    print("=" * 60)
