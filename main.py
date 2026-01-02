@@ -13,7 +13,7 @@ researcher = Agent(
     backstory="""You're a seasoned researcher with a knack for
     uncovering the latest trends and data. You're known for your
     thorough analysis and attention to detail.""",
-    verbose=True,
+    verbose=False,
     allow_delegation=False,
     tools=[search_tool]
 )
@@ -25,7 +25,7 @@ writer = Agent(
     backstory="""You're a skilled writer who can transform complex
     technical information into engaging, easy-to-understand content.
     You have a talent for storytelling.""",
-    verbose=True,
+    verbose=False,
     allow_delegation=False
 )
 
@@ -55,25 +55,12 @@ writing_task = Task(
     agent=writer
 )
 
-critic = Agent(
-    role='Content Critic',
-    goal='Review and improve written content',
-    backstory='You have an eye for quality and accuracy',
-    verbose=True
-)
-
-critique_task = Task(
-    description='Review the article and suggest 3 improvements',
-    expected_output='A list of 3 specific suggestions',
-    agent=critic
-)
-
 # Add to crew
 crew = Crew(
-    agents=[researcher, writer, critic],
-    tasks=[research_task, writing_task, critique_task],
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
     process=Process.sequential,
-    verbose=True
+    verbose=False
 )
 
 # Run the crew
