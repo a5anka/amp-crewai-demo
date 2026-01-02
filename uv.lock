@@ -586,6 +586,7 @@ dependencies = [
     { name = "crewai" },
     { name = "crewai-tools" },
     { name = "fastapi" },
+    { name = "pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -594,6 +595,7 @@ requires-dist = [
     { name = "crewai", specifier = ">=1.7.2" },
     { name = "crewai-tools", specifier = ">=1.7.2" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
 ]
 
