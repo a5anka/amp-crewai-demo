@@ -1,69 +1,8 @@
-# my_first_crew.py
+# main.py - CLI interface for CrewAI research
 
-from crewai import Agent, Task, Crew, Process
-from crewai_tools import SerperDevTool  # Web search tool
+from research import run_research
 
-# Initialize tools
-search_tool = SerperDevTool()  # Requires SERPER_API_KEY or use built-in tools
 
-# Agent 1: Researcher
-researcher = Agent(
-    role='Senior Research Analyst',
-    goal='Uncover cutting-edge developments in {topic}',
-    backstory="""You're a seasoned researcher with a knack for
-    uncovering the latest trends and data. You're known for your
-    thorough analysis and attention to detail.""",
-    verbose=False,
-    allow_delegation=False,
-    tools=[search_tool]
-)
-
-# Agent 2: Writer
-writer = Agent(
-    role='Tech Content Writer',
-    goal='Craft compelling content about {topic}',
-    backstory="""You're a skilled writer who can transform complex
-    technical information into engaging, easy-to-understand content.
-    You have a talent for storytelling.""",
-    verbose=False,
-    allow_delegation=False
-)
-
-# Task 1: Research
-research_task = Task(
-    description="""Research the latest developments in {topic}.
-    Focus on:
-    - Key innovations in the last 6 months
-    - Major players and their contributions
-    - Emerging trends
-
-    Provide a detailed bullet-point summary.""",
-    expected_output='A comprehensive research report with bullet points',
-    agent=researcher
-)
-
-# Task 2: Write Summary
-writing_task = Task(
-    description="""Using the research provided, write a 3-paragraph
-    article about {topic} that:
-    - Starts with an engaging hook
-    - Explains key developments clearly
-    - Ends with future implications
-
-    Target audience: Technical professionals.""",
-    expected_output='A 3-paragraph article',
-    agent=writer
-)
-
-# Add to crew
-crew = Crew(
-    agents=[researcher, writer],
-    tasks=[research_task, writing_task],
-    process=Process.sequential,
-    verbose=False
-)
-
-# Run the crew
 if __name__ == "__main__":
     # Ask user for topic
     topic = input("Enter the topic you'd like to research: ")
@@ -71,7 +10,7 @@ if __name__ == "__main__":
     print(f"\n🔍 Researching and writing about: {topic}")
     print("=" * 60)
 
-    result = crew.kickoff(inputs={'topic': topic})
+    result = run_research(topic)
 
     # Format output as a blog post
     print("\n" + "=" * 60)
