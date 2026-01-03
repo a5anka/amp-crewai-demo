@@ -1,100 +1,100 @@
-# CrewAI Research Demo
+# AI Research Workflow Demos
 
-A demonstration of CrewAI's multi-agent workflow for automated research and content generation. This project uses AI agents to research any topic and generate professional articles.
+This repository contains two different implementations of an AI-powered research workflow that automatically researches topics and generates articles. Each implementation uses a different framework to demonstrate various approaches to building multi-agent AI systems.
 
-## Features
+## Implementations
 
-- **Multi-agent workflow**: Researcher agent gathers information, Writer agent creates engaging content
-- **Dual interface**: Use via command line or REST API
-- **Shared logic**: Both CLI and API use the same core research function
-- **Clean output**: Formatted blog-style articles
+### 🤖 [CrewAI Implementation](./crewai/)
 
-## Setup
+A demonstration using **CrewAI**, a framework for orchestrating role-playing autonomous AI agents.
 
-1. Install dependencies:
+**Key Features:**
+- Autonomous agents with specific roles (Researcher, Writer)
+- Sequential workflow with agent delegation
+- Dual interface: CLI and REST API
+- High-level abstractions for agent collaboration
+
+**Best for:** Projects requiring autonomous agent behavior, role-based workflows, and quick setup.
+
+[View CrewAI Demo →](./crewai/README.md)
+
+---
+
+### 📊 [LangGraph Implementation](./langgraph/)
+
+An alternative implementation using **LangGraph**, a library for building stateful, multi-agent applications with explicit graph-based workflows.
+
+**Key Features:**
+- Explicit state management using TypedDict
+- Graph-based workflow with nodes and edges
+- Fine-grained control over execution flow
+- Clear visibility into state transitions
+
+**Best for:** Projects needing explicit control, complex branching logic, and detailed workflow visualization.
+
+[View LangGraph Demo →](./langgraph/README.md)
+
+---
+
+## Comparison
+
+| Feature | CrewAI | LangGraph |
+|---------|--------|-----------|
+| **Abstraction Level** | High-level, agent-focused | Low-level, graph-focused |
+| **State Management** | Implicit | Explicit (TypedDict) |
+| **Control Flow** | Autonomous agents | Manual graph construction |
+| **Learning Curve** | Easier to start | More control, steeper curve |
+| **Use Case** | Role-based collaboration | Complex workflows with branching |
+
+## Getting Started
+
+Each implementation has its own directory with:
+- Complete setup instructions
+- Detailed README
+- Independent dependencies
+- Working examples
+
+Navigate to either directory and follow the README to get started:
+
 ```bash
-uv sync
+# Try the CrewAI implementation
+cd crewai/
+# Follow instructions in crewai/README.md
+
+# Or try the LangGraph implementation
+cd langgraph/
+# Follow instructions in langgraph/README.md
 ```
 
-2. Set up API keys:
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export SERPER_API_KEY="your-serper-api-key"
-# Get Serper key from https://serper.dev
-```
+## Requirements
 
-## Usage
-
-### CLI (Command Line)
-
-Run the interactive command-line interface:
-
-```bash
-uv run python main.py
-```
-
-You'll be prompted to enter a topic, and the agents will research and write an article about it.
-
-### REST API
-
-Start the API server:
-
-```bash
-uv run uvicorn api:app --reload
-```
-
-The API will be available at `http://localhost:8000`
-
-#### API Endpoints
-
-- **GET /** - API information
-- **GET /health** - Health check
-- **POST /research** - Generate research article
-
-#### Example API Usage
-
-```bash
-# Using curl
-curl -X POST "http://localhost:8000/research" \
-  -H "Content-Type: application/json" \
-  -d '{"topic": "quantum computing"}'
-
-# Using Python requests
-import requests
-response = requests.post(
-    "http://localhost:8000/research",
-    json={"topic": "quantum computing"}
-)
-print(response.json()["article"])
-```
-
-#### API Documentation
-
-Interactive API docs available at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+Both implementations require:
+- Python 3.11+
+- OpenAI API key
+- Additional API keys (Serper for CrewAI, Tavily for LangGraph)
 
 ## Project Structure
 
 ```
 .
-├── main.py       # CLI interface
-├── api.py        # REST API interface
-├── research.py   # Shared research logic
-└── pyproject.toml
+├── README.md           # This file
+├── crewai/            # CrewAI implementation
+│   ├── README.md
+│   ├── main.py       # CLI interface
+│   ├── api.py        # REST API
+│   ├── research.py   # Core logic
+│   └── pyproject.toml
+└── langgraph/        # LangGraph implementation
+    ├── README.md
+    ├── main.py       # CLI interface
+    ├── research.py   # Graph-based workflow
+    └── pyproject.toml
 ```
 
-## How It Works
+## Contributing
 
-1. **Researcher Agent**: Searches for latest developments, key innovations, and trends
-2. **Writer Agent**: Transforms research into a compelling 3-paragraph article
-3. **Sequential Process**: Research completes first, then writing begins
+Feel free to explore both implementations, compare approaches, and experiment with modifications!
 
-## Requirements
+## License
 
-- Python >= 3.11
-- CrewAI >= 1.7.2
-- FastAPI >= 0.115.0 (for API)
-- Uvicorn >= 0.32.0 (for API)
-- OPENAI_API_KEY environment variable
-- SERPER_API_KEY environment variable
+MIT
