@@ -1,54 +1,72 @@
-# LangGraph Research Demo
+# LangGraph Blog Generator
 
-This is a research workflow implementation using **LangGraph**, providing an alternative to the CrewAI implementation in the `crewai/` folder.
+An AI-powered blog article generator built with **LangGraph**, demonstrating stateful, graph-based workflows for automated research and content creation.
 
 ## Overview
 
-LangGraph is a library for building stateful, multi-agent applications with LLMs using graph-based workflows. This implementation recreates the same research workflow as the CrewAI version but using LangGraph's state-based approach.
+This application uses LangGraph to orchestrate a multi-step workflow that researches any topic and generates professional blog articles. LangGraph's graph-based approach provides explicit control over workflow state and execution flow, making it ideal for complex, stateful AI applications.
 
-## Key Differences from CrewAI
+## What is LangGraph?
 
-### Architecture
-- **CrewAI**: Uses autonomous agents with roles and delegation
-- **LangGraph**: Uses explicit state management with nodes and edges in a graph
+LangGraph is a library for building stateful, multi-step applications with LLMs using directed graph structures. It enables:
 
-### Workflow Definition
-- **CrewAI**: Sequential process with Agent → Task assignments
-- **LangGraph**: Explicit graph with nodes (functions) and edges (transitions)
+- **Explicit state management** through TypedDict definitions
+- **Graph-based workflows** with nodes (functions) and edges (transitions)
+- **Fine-grained control** over execution flow and state transitions
+- **Easy visualization** of workflow structure and debugging
 
-### State Management
-- **CrewAI**: Implicit state passing between agents
-- **LangGraph**: Explicit state using TypedDict, tracked through the graph
+## How It Works
 
-### Control Flow
-- **CrewAI**: Process.sequential handles orchestration
-- **LangGraph**: Manual graph construction with `add_node()` and `add_edge()`
+The application uses a two-node graph workflow:
 
-## Implementation Details
+```
+START → Research → Write → END
+```
 
 ### State Structure
+
+The workflow maintains state using a typed dictionary:
+
 ```python
 class ResearchState(TypedDict):
-    topic: str
-    research_data: str
-    article: str
-    messages: Annotated[list, operator.add]
+    topic: str           # The topic to research
+    research_data: str   # Gathered research information
+    article: str         # Generated blog article
+    messages: list       # Workflow messages
 ```
 
-### Graph Nodes
-1. **research_node**: Performs web search and analysis
-2. **writing_node**: Generates article from research data
+### Workflow Nodes
 
-### Workflow
-```
-START → research → write → END
+1. **Research Node**:
+   - Performs web search using Tavily API
+   - Gathers latest information and trends
+   - Analyzes key developments
+   - Updates state with research findings
+
+2. **Writing Node**:
+   - Receives research data from state
+   - Generates engaging 3-paragraph article
+   - Uses OpenAI to craft compelling content
+   - Returns final blog post
+
+### Graph Construction
+
+The workflow is defined as a state graph:
+
+```python
+workflow = StateGraph(ResearchState)
+workflow.add_node("research", research_node)
+workflow.add_node("write", writing_node)
+workflow.add_edge(START, "research")
+workflow.add_edge("research", "write")
+workflow.add_edge("write", END)
 ```
 
 ## Setup
 
 1. Install dependencies:
 ```bash
-uv pip install -e .
+uv sync
 ```
 
 2. Set environment variables:
@@ -57,45 +75,100 @@ export OPENAI_API_KEY=your_openai_key
 export TAVILY_API_KEY=your_tavily_key
 ```
 
+Get your API keys:
+- OpenAI: https://platform.openai.com/api-keys
+- Tavily: https://tavily.com
+
 ## Usage
 
-### CLI
+### Command Line Interface
+
+Run the interactive CLI:
+
 ```bash
-python main.py
+uv run python main.py
 ```
 
-### Programmatic
+You'll be prompted to enter a topic, and the system will research and generate a blog article.
+
+### Programmatic Usage
+
+Import and use the research function directly:
+
 ```python
 from research import run_research
 
-article = run_research("artificial intelligence in healthcare")
+article = run_research("quantum computing")
 print(article)
 ```
 
+## Project Structure
+
+```
+.
+├── main.py         # CLI interface
+├── research.py     # LangGraph workflow definition
+├── pyproject.toml  # Dependencies
+└── uv.lock         # Locked dependencies
+```
+
+## Key Features
+
+### 1. Explicit State Management
+Every piece of data flows through a well-defined state structure, making it easy to track what's happening at each step.
+
+### 2. Graph-Based Architecture
+The workflow is defined as a directed graph, providing clear visibility into the execution flow and making it easy to add conditional logic or parallel execution.
+
+### 3. Functional Nodes
+Each node is a simple function that takes state and returns updated state, making them easy to test and reason about independently.
+
+### 4. Debugging & Visualization
+The graph structure can be easily visualized and debugged, with clear state transitions at each step.
+
+### 5. Flexibility
+Adding new nodes, conditional branches, or loops is straightforward thanks to the explicit graph construction.
+
 ## Requirements
 
-- Python 3.11+
-- OpenAI API key (for LLM)
-- Tavily API key (for search)
+- Python >= 3.11
+- LangGraph >= 0.0.20
+- OpenAI API key (for content generation)
+- Tavily API key (for web search)
 
-## Advantages of LangGraph
+## Use Cases
 
-1. **Explicit Control**: Fine-grained control over workflow execution
-2. **State Visibility**: Clear state structure and transitions
-3. **Flexibility**: Easy to add conditional logic, loops, or parallel execution
-4. **Debugging**: Better visibility into state at each step
-5. **Modularity**: Nodes are simple functions that can be tested independently
+LangGraph excels in scenarios requiring:
 
-## When to Use LangGraph vs CrewAI
+- **Complex workflows** with branching logic and conditionals
+- **Stateful applications** where state needs to be tracked and modified across steps
+- **Debugging & monitoring** where visibility into state transitions is important
+- **Modular design** where workflow steps need to be tested independently
+- **Dynamic routing** where execution flow depends on intermediate results
 
-**Use LangGraph when:**
-- You need explicit control over workflow state
-- Your workflow has complex branching or conditional logic
-- You want to easily visualize and debug the workflow graph
-- You prefer functional programming patterns
+## Extending the Workflow
 
-**Use CrewAI when:**
-- You want autonomous agent behavior
-- You need agent delegation and collaboration
-- You prefer a higher-level abstraction
-- Your workflow maps well to human-like roles and tasks
+The graph structure makes it easy to extend:
+
+```python
+# Add a new node
+workflow.add_node("summarize", summarize_node)
+
+# Add conditional routing
+workflow.add_conditional_edges(
+    "research",
+    should_continue,
+    {
+        "continue": "write",
+        "need_more": "research"
+    }
+)
+
+# Add parallel execution
+workflow.add_node("fact_check", fact_check_node)
+workflow.add_edge("research", "fact_check")
+```
+
+## License
+
+MIT
