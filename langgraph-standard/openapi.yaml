@@ -1,16 +1,31 @@
 openapi: 3.1.0
 info:
   title: LangGraph Research API
-  description: Generate research articles on any topic using LangGraph workflow
-  version: 1.0.0
+  description: |
+    Generate research articles using a 5-node LangGraph pipeline with fact-checking.
+
+    Pipeline: query_planner → researcher → fact_extractor → writer → fact_checker
+  version: 2.0.0
 servers:
   - url: http://localhost:8000
     description: Local development server
 paths:
   /:
     get:
-      summary: Root endpoint - API information
-      operationId: root_get
+      summary: Home page with input form
+      description: Returns an HTML page with a form to enter research topics
+      operationId: home_get
+      responses:
+        '200':
+          description: HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+  /api:
+    get:
+      summary: API information
+      operationId: api_info_get
       responses:
         '200':
           description: Successful Response
@@ -24,30 +39,27 @@ paths:
                     example: LangGraph Research API
                   version:
                     type: string
-                    example: 1.0.0
+                    example: 2.0.0
+                  pipeline:
+                    type: string
+                    example: query_planner → researcher → fact_extractor → writer → fact_checker
                   endpoints:
                     type: object
-                    properties:
-                      POST /research:
-                        type: string
-                        example: Generate research article on a topic
-                      GET /health:
-                        type: string
-                        example: Health check
   /research:
     post:
       summary: Research a topic and generate an article
       description: |
-        Research a topic and generate an article using LangGraph workflow.
-
-        The workflow uses:
-        - A research agent that searches the web using Tavily
-        - A writing node that generates a polished article
+        Research a topic using the 5-node pipeline:
+        1. query_planner - Plans search queries
+        2. researcher - Executes web searches
+        3. fact_extractor - Extracts verified facts
+        4. writer - Generates article from facts
+        5. fact_checker - Verifies claims against facts
 
         Example:
           POST /research
           {"topic": "quantum computing"}
-      operationId: research_topic_research_post
+      operationId: research_topic_post
       requestBody:
         required: true
         content:
@@ -81,10 +93,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPError'
+  /view:
+    get:
+      summary: Research a topic and view results in browser
+      description: |
+        Returns HTML page with formatted results.
+        Open directly in browser: /view?topic=quantum+computing
+      operationId: research_view_get
+      parameters:
+        - name: topic
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The topic to research
+      responses:
+        '200':
+          description: HTML page with results
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Bad Request - Invalid or empty topic
   /health:
     get:
       summary: Health check endpoint
-      operationId: health_health_get
+      operationId: health_get
       responses:
         '200':
           description: Successful Response
@@ -117,6 +152,7 @@ components:
       required:
         - topic
         - article
+        - fact_check_result
       properties:
         topic:
           type: string
@@ -126,6 +162,10 @@ components:
           type: string
           title: Article
           description: The generated research article
+        fact_check_result:
+          type: string
+          title: Fact Check Result
+          description: Analysis of claims verified against extracted facts
       title: ResearchResponse
     HTTPError:
       type: object
