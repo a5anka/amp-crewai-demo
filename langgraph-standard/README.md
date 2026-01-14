@@ -89,6 +89,46 @@ Get your API keys:
 
 ## Usage
 
+### REST API
+
+Start the API server:
+
+```bash
+uvicorn api:app --reload
+```
+
+The API will be available at `http://localhost:8000`.
+
+**Endpoints:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | API information |
+| POST | `/research` | Generate research article |
+| GET | `/health` | Health check |
+
+**Example request:**
+
+```bash
+curl -X POST http://localhost:8000/research \
+  -H "Content-Type: application/json" \
+  -d '{"topic": "artificial intelligence in healthcare"}'
+```
+
+**Example response:**
+
+```json
+{
+  "topic": "artificial intelligence in healthcare",
+  "article": "..."
+}
+```
+
+**API Documentation:**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- OpenAPI spec: `openapi.yaml`
+
 ### Command Line Interface
 
 Run the interactive CLI:
@@ -114,8 +154,10 @@ print(article)
 
 ```
 .
+├── api.py             # FastAPI REST API
 ├── main.py            # CLI interface
 ├── research.py        # LangGraph workflow definition
+├── openapi.yaml       # OpenAPI specification
 ├── requirements.txt   # Python dependencies
 └── .env.example       # Example environment variables
 ```
@@ -141,6 +183,7 @@ Adding new nodes, conditional branches, or loops is straightforward thanks to th
 
 - Python >= 3.10
 - LangGraph >= 0.2.0
+- FastAPI >= 0.115.0
 - OpenAI API key (for content generation)
 - Tavily API key (for web search)
 

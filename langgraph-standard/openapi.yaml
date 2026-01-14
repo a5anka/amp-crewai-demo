@@ -1,0 +1,166 @@
+openapi: 3.1.0
+info:
+  title: LangGraph Research API
+  description: Generate research articles on any topic using LangGraph workflow
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+paths:
+  /:
+    get:
+      summary: Root endpoint - API information
+      operationId: root_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: LangGraph Research API
+                  version:
+                    type: string
+                    example: 1.0.0
+                  endpoints:
+                    type: object
+                    properties:
+                      POST /research:
+                        type: string
+                        example: Generate research article on a topic
+                      GET /health:
+                        type: string
+                        example: Health check
+  /research:
+    post:
+      summary: Research a topic and generate an article
+      description: |
+        Research a topic and generate an article using LangGraph workflow.
+
+        The workflow uses:
+        - A research agent that searches the web using Tavily
+        - A writing node that generates a polished article
+
+        Example:
+          POST /research
+          {"topic": "quantum computing"}
+      operationId: research_topic_research_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResearchRequest'
+            example:
+              topic: artificial intelligence in healthcare
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchResponse'
+        '400':
+          description: Bad Request - Invalid or empty topic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: langgraph-research
+components:
+  schemas:
+    ResearchRequest:
+      type: object
+      required:
+        - topic
+      properties:
+        topic:
+          type: string
+          title: Topic
+          description: The topic to research and generate an article about
+          minLength: 1
+      title: ResearchRequest
+    ResearchResponse:
+      type: object
+      required:
+        - topic
+        - article
+      properties:
+        topic:
+          type: string
+          title: Topic
+          description: The topic that was researched
+        article:
+          type: string
+          title: Article
+          description: The generated research article
+      title: ResearchResponse
+    HTTPError:
+      type: object
+      properties:
+        detail:
+          type: string
+          title: Detail
+          description: Error message
+      title: HTTPError
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+      title: HTTPValidationError
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      title: ValidationError
