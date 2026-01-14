@@ -1,13 +1,12 @@
-# research.py - Research workflow using LangGraph
+# research.py - 5-Node Research Pipeline using LangGraph
 
 import os
-from typing import TypedDict, Annotated, Literal
+from typing import TypedDict, Annotated
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_core.tools import tool
 from tavily import TavilyClient
-from langgraph.graph import StateGraph, END, MessagesState
-from langgraph.prebuilt import ToolNode
+from langgraph.graph import StateGraph, END
 import operator
 
 
@@ -16,8 +15,11 @@ class ResearchState(TypedDict):
     """State for the research workflow"""
     topic: str
     messages: Annotated[list[BaseMessage], operator.add]
-    research_complete: bool
-    article: str
+    search_queries: list[str]  # Planned search queries from query_planner
+    search_results: str  # Raw search results from researcher
+    extracted_facts: list[str]  # Facts extracted from research
+    article: str  # Generated article
+    fact_check_result: str  # Result from fact checker
 
 
 # Define Tavily search as a tool
@@ -32,7 +34,7 @@ def tavily_search(query: str) -> str:
         Formatted search results
     """
     client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    results = client.search(query=query, max_results=5)
+    results = client.search(query=query, max_results=3)
 
     # Format results for the LLM
     formatted_results = []
@@ -46,122 +48,229 @@ def tavily_search(query: str) -> str:
     return "\n---\n".join(formatted_results)
 
 
-def research_agent(state: ResearchState) -> ResearchState:
+# ============================================================================
+# NODE 1: Query Planner
+# ============================================================================
+def query_planner(state: ResearchState) -> ResearchState:
     """
-    Research agent that uses tools to gather information
+    Analyzes the topic and generates strategic search queries.
+    This node plans what information to search for.
     """
-    # Initialize LLM with tools
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    tools = [tavily_search]
-    llm_with_tools = llm.bind_tools(tools)
 
-    # Create research prompt if not already in messages
-    if len(state["messages"]) == 0:
-        system_msg = SystemMessage(
-            content="You are a senior research analyst with expertise in uncovering the latest trends and data. "
-                    "Use the tavily_search tool to research the topic thoroughly."
-        )
-        human_msg = HumanMessage(
-            content=f"""Research the latest developments in {state['topic']}.
+    system_msg = SystemMessage(
+        content="You are a research strategist. Generate 2 focused search queries."
+    )
 
-Focus on:
-- Key innovations in the last 6 months
-- Major players and their contributions
-- Emerging trends
+    human_msg = HumanMessage(
+        content=f"""Topic: {state['topic']}
 
-Use the search tool to gather information, then provide a detailed bullet-point summary."""
-        )
-        messages = [system_msg, human_msg]
-    else:
-        messages = state["messages"]
+Generate exactly 2 specific search queries to research this topic.
+Focus on recent developments and technical details.
 
-    # Get response from LLM
-    response = llm_with_tools.invoke(messages)
+Return ONLY the queries, one per line, no numbering or bullets."""
+    )
+
+    response = llm.invoke([system_msg, human_msg])
+
+    # Parse queries from response
+    queries = [q.strip() for q in response.content.strip().split('\n') if q.strip()]
 
     return {
         **state,
-        "messages": [response]
+        "search_queries": queries,
+        "messages": [system_msg, human_msg, response]
     }
 
 
-# Should we continue or finish research?
-def should_continue_research(state: ResearchState) -> Literal["tools", "write"]:
-    """Determine if we should continue research or move to writing"""
-    last_message = state["messages"][-1]
-
-    # If the LLM called tools, continue to tool execution
-    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-        return "tools"
-
-    # Otherwise, move to writing
-    return "write"
-
-
-def writing_node(state: ResearchState) -> ResearchState:
+# ============================================================================
+# NODE 2: Researcher (Direct Search - No Tool Loop)
+# ============================================================================
+def researcher(state: ResearchState) -> ResearchState:
     """
-    Writing node that creates an article based on research
+    Executes the planned search queries directly using Tavily.
+    Simplified approach - no tool calling loop, just direct searches.
     """
-    # Initialize LLM
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+    # Get queries (limit to 2 for speed)
+    queries = state.get("search_queries", [])[:2]
 
-    # Add writing instruction to the conversation
-    writing_msg = HumanMessage(
-        content=f"""Now write a 3-paragraph article about {state['topic']} that:
-- Starts with an engaging hook
-- Explains key developments clearly
-- Ends with future implications
+    # Execute searches directly
+    all_results = []
+    for query in queries:
+        try:
+            result = tavily_search.invoke(query)
+            all_results.append(f"=== Search: {query} ===\n{result}")
+        except Exception as e:
+            all_results.append(f"=== Search: {query} ===\nError: {str(e)}")
 
-Target audience: Technical professionals.
+    search_results = "\n\n".join(all_results)
 
-Use the research you gathered above to write the article."""
+    # Create message for trace visibility
+    research_msg = AIMessage(content=f"Completed {len(queries)} searches.\n\n{search_results}")
+
+    return {
+        **state,
+        "search_results": search_results,
+        "messages": [research_msg]
+    }
+
+
+# ============================================================================
+# NODE 3: Fact Extractor
+# ============================================================================
+def fact_extractor(state: ResearchState) -> ResearchState:
+    """
+    Extracts key facts from the search results as a structured list.
+    This creates a clean fact base that the writer must use.
+    """
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    # Use the search_results directly
+    research_content = state.get("search_results", "")
+
+    system_msg = SystemMessage(
+        content="You are a fact extraction specialist. Extract only verifiable facts from research. "
+                "Do not add any interpretation or information not explicitly stated in the research."
     )
 
-    messages = state["messages"] + [writing_msg]
+    human_msg = HumanMessage(
+        content=f"""From the search results below, extract key facts as a numbered list.
 
-    # Generate article
-    response = llm.invoke(messages)
+RULES:
+- Only include facts explicitly stated in the search results
+- Each fact should be a single, specific claim
+- Do NOT add any information not in the search results
+
+Search Results:
+{research_content}
+
+Extract 5-8 key facts:"""
+    )
+
+    response = llm.invoke([system_msg, human_msg])
+
+    # Parse facts from response
+    facts = [line.strip() for line in response.content.strip().split('\n') if line.strip()]
+
+    return {
+        **state,
+        "extracted_facts": facts,
+        "messages": [system_msg, human_msg, response]
+    }
+
+
+# ============================================================================
+# NODE 4: Writer
+# ============================================================================
+def writer(state: ResearchState) -> ResearchState:
+    """
+    Writes an article using ONLY the extracted facts.
+    This is intentionally weak to demonstrate hallucination issues.
+    """
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+
+    facts_text = "\n".join(state.get("extracted_facts", []))
+
+    system_msg = SystemMessage(
+        content="You are a professional tech writer. Write engaging articles based on the facts provided."
+    )
+
+    human_msg = HumanMessage(
+        content=f"""Write a 3-paragraph article about {state['topic']}.
+
+Available facts:
+{facts_text}
+
+Requirements:
+- Start with an engaging hook
+- Explain key developments clearly
+- End with future implications
+- Target audience: Technical professionals
+
+Write the article:"""
+    )
+
+    response = llm.invoke([system_msg, human_msg])
 
     return {
         **state,
         "article": response.content,
-        "messages": [writing_msg, response]
+        "messages": [system_msg, human_msg, response]
+    }
+
+
+# ============================================================================
+# NODE 5: Fact Checker
+# ============================================================================
+def fact_checker(state: ResearchState) -> ResearchState:
+    """
+    Verifies that claims in the article match the extracted facts.
+    Identifies any hallucinated content not supported by research.
+    """
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    facts_text = "\n".join(state.get("extracted_facts", []))
+    article = state.get("article", "")
+
+    system_msg = SystemMessage(
+        content="You are a fact-checking specialist. Compare articles against source facts "
+                "and identify any claims not supported by the evidence."
+    )
+
+    human_msg = HumanMessage(
+        content=f"""Compare the article against the verified facts and identify any issues.
+
+VERIFIED FACTS:
+{facts_text}
+
+ARTICLE TO CHECK:
+{article}
+
+For each claim in the article, determine if it is:
+- VERIFIED: Directly supported by the facts
+- UNSUPPORTED: Not found in the facts (potential hallucination)
+- EXAGGERATED: Overstates what the facts say
+
+Provide your analysis:"""
+    )
+
+    response = llm.invoke([system_msg, human_msg])
+
+    return {
+        **state,
+        "fact_check_result": response.content,
+        "messages": [system_msg, human_msg, response]
     }
 
 
 def create_research_workflow():
     """
-    Create and compile the LangGraph research workflow with tool calling
+    Create and compile the 5-node LangGraph research workflow.
+
+    Pipeline (linear flow):
+    1. query_planner → Plan search strategy
+    2. researcher → Execute searches directly
+    3. fact_extractor → Extract verified facts
+    4. writer → Generate article from facts
+    5. fact_checker → Verify article against facts
     """
     # Create the graph
     workflow = StateGraph(ResearchState)
 
-    # Create tool node
-    tools = [tavily_search]
-    tool_node = ToolNode(tools)
+    # Add all 5 nodes
+    workflow.add_node("query_planner", query_planner)
+    workflow.add_node("researcher", researcher)
+    workflow.add_node("fact_extractor", fact_extractor)
+    workflow.add_node("writer", writer)
+    workflow.add_node("fact_checker", fact_checker)
 
-    # Add nodes
-    workflow.add_node("research_agent", research_agent)
-    workflow.add_node("tools", tool_node)
-    workflow.add_node("write", writing_node)
-
-    # Add edges
-    workflow.set_entry_point("research_agent")
-
-    # Add conditional edge from research agent
-    workflow.add_conditional_edges(
-        "research_agent",
-        should_continue_research,
-        {
-            "tools": "tools",
-            "write": "write"
-        }
-    )
-
-    # After tools, go back to research agent
-    workflow.add_edge("tools", "research_agent")
-
-    # After writing, end
-    workflow.add_edge("write", END)
+    # Define linear flow
+    workflow.set_entry_point("query_planner")
+    workflow.add_edge("query_planner", "researcher")
+    workflow.add_edge("researcher", "fact_extractor")
+    workflow.add_edge("fact_extractor", "writer")
+    workflow.add_edge("writer", "fact_checker")
+    workflow.add_edge("fact_checker", END)
 
     # Compile the graph
     app = workflow.compile()
@@ -169,15 +278,15 @@ def create_research_workflow():
     return app
 
 
-def run_research(topic: str) -> str:
+def run_research(topic: str) -> dict:
     """
-    Run research on a given topic using LangGraph
+    Run research on a given topic using the 5-node LangGraph pipeline.
 
     Args:
         topic: The topic to research and write about
 
     Returns:
-        str: The generated article
+        dict: Full result including article, facts, and fact-check results
     """
     # Validate required API keys
     if not os.getenv("OPENAI_API_KEY"):
@@ -188,22 +297,29 @@ def run_research(topic: str) -> str:
     # Create workflow
     app = create_research_workflow()
 
-    # Initialize state
+    # Initialize state with all required fields
     initial_state = {
         "topic": topic,
         "messages": [],
-        "research_complete": False,
-        "article": ""
+        "search_queries": [],
+        "search_results": "",
+        "extracted_facts": [],
+        "article": "",
+        "fact_check_result": ""
     }
 
     # Run the workflow
     result = app.invoke(initial_state)
 
-    return result["article"]
+    return {
+        "article": result["article"],
+        "fact_check_result": result["fact_check_result"]
+    }
 
 
 if __name__ == "__main__":
-    # Example usage
+    # Example usage with 5-node pipeline
     topic = "artificial intelligence in healthcare"
-    article = run_research(topic)
-    print(article)
+    result = run_research(topic)
+    print("Article:", result["article"])
+    print("\nFact Check:", result["fact_check_result"])
